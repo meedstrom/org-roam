@@ -28,137 +28,13 @@
 ;;
 ;;; Code:
 (require 'org-roam)
+(require 'org-roam-node)
+(require 'org-roam-utils)
+(require 'magit-section)
+(eieio-declare-slots node)
 
 ;;;; Declarations
 (defvar org-ref-buffer-hacked)
-
-;;; Options
-(defcustom org-roam-mode-sections (list #'org-roam-backlinks-section
-                                        #'org-roam-reflinks-section)
-  "A list of sections for the `org-roam-mode' based buffers.
-Each section is a function that is passed the `org-roam-node'
-for which the section will be constructed as the first
-argument. Normally this node is `org-roam-buffer-current-node'.
-The function may also accept other optional arguments. Each item
-in the list is either:
-
-1. A function, which is called only with the `org-roam-node' as the argument
-2. A list, containing the function and the optional arguments.
-
-For example, one can add
-
-    (org-roam-backlinks-section :unique t)
-
-to the list to pass :unique t to the section-rendering function."
-  :group 'org-roam
-  :type `(repeat (choice (symbol :tag "Function")
-                         (list :tag "Function with arguments"
-                               (symbol :tag "Function")
-                               (repeat :tag "Arguments" :inline t (sexp :tag "Arg"))))))
-
-(defcustom org-roam-buffer-postrender-functions (list)
-  "Functions to run after the Org-roam buffer is rendered.
-Each function accepts no arguments, and is run with the Org-roam
-buffer as the current buffer."
-  :group 'org-roam
-  :type 'hook)
-
-(defcustom org-roam-preview-function #'org-roam-preview-default-function
-  "The preview function to use to populate the Org-roam buffer.
-
-The function takes no arguments, but the point is temporarily set
-to the exact location of the backlink."
-  :group 'org-roam
-  :type 'function)
-
-(defcustom org-roam-preview-postprocess-functions (list #'org-roam-strip-comments)
-  "A list of functions to postprocess the preview content.
-
-Each function takes a single argument, the string for the preview
-content, and returns the post-processed string. The functions are
-applied in order of appearance in the list."
-  :group 'org-roam
-  :type 'hook)
-
-;;; Faces
-(defface org-roam-header-line
-  `((((class color) (background light))
-     ,@(and (>= emacs-major-version 27) '(:extend t))
-     :foreground "DarkGoldenrod4"
-     :weight bold)
-    (((class color) (background  dark))
-     ,@(and (>= emacs-major-version 27) '(:extend t))
-     :foreground "LightGoldenrod2"
-     :weight bold))
-  "Face for the `header-line' in some Org-roam modes."
-  :group 'org-roam-faces)
-
-(defface org-roam-title
-  '((t :weight bold))
-  "Face for Org-roam titles."
-  :group 'org-roam-faces)
-
-(defface org-roam-olp
-  '((((class color) (background light)) :foreground "grey60")
-    (((class color) (background  dark)) :foreground "grey40"))
-  "Face for the OLP of the node."
-  :group 'org-roam-faces)
-
-(defface org-roam-preview-heading
-  `((((class color) (background light))
-     ,@(and (>= emacs-major-version 27) '(:extend t))
-     :background "grey80"
-     :foreground "grey30")
-    (((class color) (background dark))
-     ,@(and (>= emacs-major-version 27) '(:extend t))
-     :background "grey25"
-     :foreground "grey70"))
-  "Face for preview headings."
-  :group 'org-roam-faces)
-
-(defface org-roam-preview-heading-highlight
-  `((((class color) (background light))
-     ,@(and (>= emacs-major-version 27) '(:extend t))
-     :background "grey75"
-     :foreground "grey30")
-    (((class color) (background dark))
-     ,@(and (>= emacs-major-version 27) '(:extend t))
-     :background "grey35"
-     :foreground "grey70"))
-  "Face for current preview headings."
-  :group 'org-roam-faces)
-
-(defface org-roam-preview-heading-selection
-  `((((class color) (background light))
-     ,@(and (>= emacs-major-version 27) '(:extend t))
-     :inherit org-roam-preview-heading-highlight
-     :foreground "salmon4")
-    (((class color) (background dark))
-     ,@(and (>= emacs-major-version 27) '(:extend t))
-     :inherit org-roam-preview-heading-highlight
-     :foreground "LightSalmon3"))
-  "Face for selected preview headings."
-  :group 'org-roam-faces)
-
-(defface org-roam-preview-region
-  `((t :inherit bold
-       ,@(and (>= emacs-major-version 27)
-              (list :extend (ignore-errors (face-attribute 'region :extend))))))
-  "Face used by `org-roam-highlight-preview-region-using-face'.
-
-This face is overlaid over text that uses other hunk faces,
-and those normally set the foreground and background colors.
-The `:foreground' and especially the `:background' properties
-should be avoided here.  Setting the latter would cause the
-loss of information.  Good properties to set here are `:weight'
-and `:slant'."
-  :group 'org-roam-faces)
-
-(defface org-roam-dim
-  '((((class color) (background light)) :foreground "grey60")
-    (((class color) (background  dark)) :foreground "grey40"))
-  "Face for the dimmer part of the widgets."
-  :group 'org-roam-faces)
 
 ;;; Major mode
 (defvar org-roam-mode-map
@@ -300,6 +176,7 @@ The content inside of this buffer will be automatically updated
 to the nearest node at point that comes from the current buffer.
 To toggle its display use `org-roam-buffer-toggle' command.")
 
+;;;###autoload
 (defun org-roam-buffer-toggle ()
   "Toggle display of the persistent `org-roam-buffer'."
   (interactive)
@@ -421,6 +298,7 @@ the same time:
   "A `magit-section' used by `org-roam-mode' to contain preview content.
 The preview content comes from FILE, and the link as at POINT.")
 
+;;;###autoload
 (defun org-roam-preview-visit (file point &optional other-window)
   "Visit FILE at POINT and return the visited buffer.
 With OTHER-WINDOW non-nil do so in another window.
@@ -605,6 +483,7 @@ Sorts by title."
    (col :initform nil))
   "A `magit-section' used by `org-roam-mode' to contain grep output.")
 
+;;;###autoload
 (defun org-roam-grep-visit (file &optional other-window row col)
   "Visit FILE at row ROW (if any) and column COL (if any). Return the buffer.
 With OTHER-WINDOW non-nil (in interactive calls set with
