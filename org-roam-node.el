@@ -1154,9 +1154,13 @@ and when nil is returned the node will be filtered out."
   "Add ALIAS to the node at point."
   (interactive "sAlias: ")
   (let ((node (org-roam-node-at-point 'assert)))
-    (save-excursion
-      (goto-char (org-roam-node-point node))
-      (org-roam-property-add "ROAM_ALIASES" alias))))
+    (when (or (not (called-interactively-p 'any))
+              (not (member alias (org-roam--get-titles)))
+              (y-or-n-p (format "Alias \"%s\" already exists, really add here too? "
+                                alias)))
+      (save-excursion
+        (goto-char (org-roam-node-point node))
+        (org-roam-property-add "ROAM_ALIASES" alias)))))
 
 (defun org-roam-alias-remove (&optional alias)
   "Remove an ALIAS from the node at point."
