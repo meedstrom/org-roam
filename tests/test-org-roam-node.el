@@ -224,7 +224,46 @@
     (org-roam-with-temp-buffer "tests/roam-files/with-alias.org"
       (org-roam-alias-remove "Batman")
       (expect (buffer-substring-no-properties (point) (point-max))
-              :to-equal ":PROPERTIES:\n:ID: 57ff3ce7-5bda-4825-8fca-c09f523e87ba\n:ROAM_ALIASES: \"The Dark Knight\"\n:END:\n#+title: Bruce Wayne\n"))))
+              :to-equal ":PROPERTIES:\n:ID: 57ff3ce7-5bda-4825-8fca-c09f523e87ba\n:ROAM_ALIASES: \"The Dark Knight\"\n:END:\n#+title: Bruce Wayne\n")))
+
+  (it "will create duplicates without prompt or complaint if called from Lisp"
+    (let (bufs-to-delete)
+      (save-current-buffer
+        (org-roam-capture- :node (org-roam-node-create :title "Delete me 1"
+                                                       :id    "DeleteThisId1")
+                           :keys "d"
+                           :props (list :immediate-finish t
+                                        :jump-to-captured t))
+        (expect (org-id-get) :to-equal "DeleteThisId1")
+        (push (current-buffer) bufs-to-delete)
+        (org-roam-alias-add "A duplicated alias")
+        (save-buffer)
+
+        (org-roam-capture- :node (org-roam-node-create :title "Delete me 2"
+                                                       :id    "DeleteThisId2")
+                           :keys "d"
+                           :props (list :immediate-finish t
+                                        :jump-to-captured t))
+        (expect (org-id-get) :to-equal "DeleteThisId2")
+        (push (current-buffer) bufs-to-delete)
+        (org-roam-alias-add "A duplicated alias")
+        (save-buffer))
+
+      (org-roam-db-sync)
+      (expect (cl-loop for (alias)
+                       in (org-roam-db-query [:select alias :from aliases])
+                       count (equal alias "A duplicated alias"))
+              :to-equal 2)
+      ;; Clean up, then test whether it cleaned up correctly.
+      (dolist (buf bufs-to-delete)
+        (with-current-buffer buf
+          (delete-file buffer-file-name)
+          (kill-buffer buf)))
+      (org-roam-db-sync)
+      (expect (cl-loop for (alias)
+                       in (org-roam-db-query [:select alias :from aliases])
+                       count (equal alias "A duplicated alias"))
+              :to-equal 0))))
 
 (describe "org-roam-node-slug"
   (it "transforms the title as intended"
